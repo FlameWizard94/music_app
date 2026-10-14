@@ -9,7 +9,7 @@
 #include <QSettings>
 #include <QPushButton>
 #include <QSlider>
-#include "music_data.h"
+#include "musicData.h"
 #include "playlist.h"
 
 QT_BEGIN_NAMESPACE
@@ -27,11 +27,10 @@ public:
     ~MainWindow() override;
 
 private slots:
-    void on_pauseButton_clicked(bool checked);
-    void songSelected();
-    QString formatTime(qint64 ms);
-
+    void pauseButtonClicked(bool checked);
+    void playlistSongSelected();
     void on_actionOpen_Music_Folder_triggered();
+    void musicDataSelected(QTreeWidgetItem * node, int column);
 
 private:
     Ui::MainWindow *ui;
@@ -42,5 +41,8 @@ private:
     MusicData * musicData;
     //Playlist * playlist;
     bool userSeeking = false;
+    Playlist *createPlaylistTab(const QString &title);
+    Playlist *currentPlaylist() const;
+    QString formatTime(qint64 ms);
 };
 #endif // MAINWINDOW_H

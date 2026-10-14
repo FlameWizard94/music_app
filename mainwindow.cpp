@@ -3,6 +3,8 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDebug>
+#include "musicDataView.h"
+#include <QLayout>
 
 //To Do
 //1. User selects music dir
@@ -15,6 +17,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     ui->pauseButton->setCheckable(true);
+
+    ui->menuBar->show();
+    ui->menuFile->show();
 
 
     player = new QMediaPlayer(this);
@@ -29,34 +34,53 @@ MainWindow::MainWindow(QWidget *parent)
             ui->pauseButton->setText("Play");
     });
 
-    connect(ui->pauseButton,  &QPushButton::clicked, this, &MainWindow::on_pauseButton_clicked);
+    connect(ui->pauseButton,  &QPushButton::clicked, this, &MainWindow::pauseButtonClicked);
 
+    musicData = new MusicData(this);
+    musicData->buildFrom(music_dir, /*update=*/false);
+
+    /*
+    ui->musicData->buildFrom(music_dir,true);
+    ui->musicData->hide();
     connect(ui->musicData, &MusicData::finished, this, [this]() {
-        /*ui->playlist->buildFrom(musicData,
-                                "Naoki tracks",
-                                "Guilty Gear Strive OST [Vocal Tracks]",
-                                "NAOKI",
-                                true); */
-        //connect(ui->playlist, &QListWidget::itemDoubleClicked, this, &MainWindow::songSelected);
         ui->playlist->buildFrom(ui->musicData,
                                 "",
                                 "",
                                 "",
-                                /*update=*/true);
+                                true);
     });
+    */
+
 
     QSettings settings;
     music_dir = settings.value("musid_dir").toString();
     qDebug() << "Music dir on startup: " + music_dir;
     settings.setValue("music_dir", music_dir);
-    ui->musicData->buildFrom(music_dir,
-                         /*update=*/true);
-
 
     ui->timeSlider->setRange(0, 0);
     ui->timeSlider->setValue(0);
 
     ui->timeLabel->setText("00:00");
+
+    ui->volumeSlider->setRange(0, 100);
+    float volume = settings.value("volume").toFloat();
+    audioOutput->setVolume(volume);
+    ui->volumeSlider->setValue(static_cast<int>(volume * 100));
+
+    //Make default playlist for testing
+    connect(musicData, &MusicData::finished, this, [this]() {
+        ui->playlist->buildFrom(musicData,
+                                "",
+                                "",
+                                "",
+                                true);
+    });
+
+    //Load musicDataView when musicData is done
+    connect(musicData, &MusicData::finished, this, [this](){
+        ui->musicDataView->buildFrom(musicData,
+                                     SortMode::AlbumArtist);
+    });
 
     //When user presses slider, give user priority
     connect(ui->timeSlider, &QSlider::sliderPressed, this, [this]() {
@@ -83,22 +107,30 @@ MainWindow::MainWindow(QWidget *parent)
         ui->timeLabel->setText(formatTime(position) + " / " + formatTime(player->duration()));
     });
 
+    //Song Selected
     connect(ui->playlist, &QListWidget::itemDoubleClicked,
-            this, &MainWindow::songSelected);
-
-    ui->volumeSlider->setRange(0, 100);
-    float volume = settings.value("volume").toFloat();
-    audioOutput->setVolume(volume);
-    ui->volumeSlider->setValue(static_cast<int>(volume * 100));
+            this, &MainWindow::playlistSongSelected);
 
     //Change volume
     connect(ui->volumeSlider, &QSlider::valueChanged, this, [this]()
-            {
-                float volume = static_cast<float>(ui->volumeSlider->value()) / 100;
-                QSettings volume_settings;
-                audioOutput->setVolume((volume));
-                volume_settings.setValue("volume", volume);
-            });
+    {
+        float volume = static_cast<float>(ui->volumeSlider->value()) / 100;
+        QSettings volume_settings;
+        audioOutput->setVolume((volume));
+        volume_settings.setValue("volume", volume);
+    });
+
+    //Close playlist tab
+    connect(ui->playlistTabs, &QTabWidget::tabCloseRequested, this, [this](int index) {
+        QWidget *page = ui->playlistTabs->widget(index);
+        ui->playlistTabs->removeTab(index);
+        page->deleteLater();
+    });
+
+    //MusicDataView node selected
+    connect(ui->musicDataView, &QTreeWidget::itemDoubleClicked, this, &MainWindow::musicDataSelected);
+
+
 }
 
 MainWindow::~MainWindow()
@@ -107,7 +139,7 @@ MainWindow::~MainWindow()
 }
 
 
-void MainWindow::on_pauseButton_clicked(bool checked)
+void MainWindow::pauseButtonClicked(bool checked)
 {
     if (checked)
     {
@@ -121,10 +153,33 @@ void MainWindow::on_pauseButton_clicked(bool checked)
     }
 }
 
-void MainWindow::songSelected()
+void MainWindow::musicDataSelected(QTreeWidgetItem * node, int column)
+{
+    //QTreeWidgetItem * node = ui->musicDataView->selectedItems().at(0);
+    QString playlist_name = node->text(0);
+    Playlist * p = createPlaylistTab(playlist_name);
+    int num_children = node->childCount();
+    if(num_children > 0)
+    {
+        for (int i = 0; i < num_children; i++)
+        {
+            p->appendSong(node->child(i));
+        }
+    }
+    else
+    {
+        p->appendSong(node);
+    }
+}
+
+void MainWindow::playlistSongSelected()
 {
     QSettings defaults;
-    QListWidgetItem * current = ui->playlist->currentItem();
+    Playlist *playlist = currentPlaylist();
+    if (!playlist) return;
+
+
+    QListWidgetItem * current = playlist->currentItem();
     if (!current) return;
 
     QString path = current->data(SongRoles::Path).toString();
@@ -134,6 +189,32 @@ void MainWindow::songSelected()
     ui->timeLabel->setText("00:00 / " + formatTime(duration));
     player->play();
     qDebug() << "Duration " << duration;
+}
+
+
+Playlist *MainWindow::createPlaylistTab(const QString &title)
+{
+    auto *page = new QWidget;
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    auto *playlist = new Playlist(page);
+    layout->addWidget(playlist);
+
+    ui->playlistTabs->addTab(page, title);
+    ui->playlistTabs->setCurrentWidget(page);
+
+    // Wire up double-click for this new playlist
+    connect(playlist, &QListWidget::itemDoubleClicked,
+            this, &MainWindow::playlistSongSelected);
+
+    return playlist;
+}
+
+Playlist *MainWindow::currentPlaylist() const
+{
+    QWidget *page = ui->playlistTabs->currentWidget();
+    return page ? page->findChild<Playlist *>() : nullptr;
 }
 
 QString MainWindow::formatTime(qint64 ms)
@@ -174,11 +255,11 @@ void MainWindow::on_actionOpen_Music_Folder_triggered()
 {
     QSettings settings;
     music_dir = QFileDialog::getExistingDirectory(this, tr("Music Folder"),
-                                                  "/home/smart/Music",
+                                                  "/home/smart/Music/Music (saved)",
                                                   QFileDialog::ShowDirsOnly
                                                 | QFileDialog::DontResolveSymlinks);
     settings.setValue("music_dir", music_dir);
-    ui->musicData->buildFrom(settings.value("music_dir").toString(),
-                         /*update=*/true);
+    //ui->musicData->buildFrom(settings.value("music_dir").toString(), true);
+    musicData->buildFrom(settings.value("music_dir").toString(), true);
 }
 

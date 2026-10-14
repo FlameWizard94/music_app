@@ -33,10 +33,12 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(music_app
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        music_data.h
-        music_data.cpp
+        musicData.h
+        musicData.cpp
         playlist.h
         playlist.cpp
+        musicDataView.h
+        musicDataView.cpp
     )
 
 # Define target properties for Android with Qt 6 as:

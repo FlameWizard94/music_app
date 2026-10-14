@@ -95,15 +95,40 @@
      <string>Play</string>
     </property>
    </widget>
-   <widget class="MusicData" name="musicData">
+   <widget class="MusicDataView" name="musicDataView">
     <property name="geometry">
      <rect>
-      <x>45</x>
-      <y>391</y>
-      <width>801</width>
-      <height>501</height>
+      <x>10</x>
+      <y>40</y>
+      <width>431</width>
+      <height>701</height>
      </rect>
     </property>
+    <column>
+     <property name="text">
+      <string notr="true">1</string>
+     </property>
+    </column>
+   </widget>
+   <widget class="QTabWidget" name="playlistTabs">
+    <property name="geometry">
+     <rect>
+      <x>880</x>
+      <y>60</y>
+      <width>931</width>
+      <height>301</height>
+     </rect>
+    </property>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string>Tab 1</string>
+     </attribute>
+    </widget>
+    <widget class="QWidget" name="tab_2">
+     <attribute name="title">
+      <string>Tab 2</string>
+     </attribute>
+    </widget>
    </widget>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -137,9 +162,9 @@
    <header>playlist.h</header>
   </customwidget>
   <customwidget>
-   <class>MusicData</class>
-   <extends>QListWidget</extends>
-   <header location="global">music_data.h</header>
+   <class>MusicDataView</class>
+   <extends>QTreeWidget</extends>
+   <header>musicDataView.h</header>
   </customwidget>
  </customwidgets>
  <resources/>
