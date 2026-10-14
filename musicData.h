@@ -31,9 +31,8 @@ signals:
 private:
     //QMediaMetaData * metaData;
     QVector<Song> m_songs;
-    QMediaPlayer * player;
+    QMediaPlayer * m_player;
     QStringList m_pendingPaths;
-    QStringList m_newData;
     QString m_currentPath;
     QString m_currentDir;
     void saveToSettings() const;

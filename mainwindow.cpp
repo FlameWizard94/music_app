@@ -21,41 +21,26 @@ MainWindow::MainWindow(QWidget *parent)
     ui->menuBar->show();
     ui->menuFile->show();
 
+    QSettings settings;
+    music_dir = settings.value("music_dir").toString();
+    qDebug() << "Music dir on startup: " + music_dir;
+    settings.setValue("music_dir", music_dir);
+
 
     player = new QMediaPlayer(this);
     audioOutput = new QAudioOutput(this);
     player->setAudioOutput(audioOutput);
     //player->setSource(QUrl::fromLocalFile("/home/smart/Documents/Projects/Music Application/testing/Track 3.m4a"));
 
-    connect(player, &QMediaPlayer::playingChanged, this, [this](){
-        if (player->isPlaying())
-            ui->pauseButton->setText("Pause");
-        else
-            ui->pauseButton->setText("Play");
-    });
-
-    connect(ui->pauseButton,  &QPushButton::clicked, this, &MainWindow::pauseButtonClicked);
 
     musicData = new MusicData(this);
-    musicData->buildFrom(music_dir, /*update=*/false);
-
-    /*
-    ui->musicData->buildFrom(music_dir,true);
-    ui->musicData->hide();
-    connect(ui->musicData, &MusicData::finished, this, [this]() {
-        ui->playlist->buildFrom(ui->musicData,
-                                "",
-                                "",
-                                "",
-                                true);
-    });
-    */
-
-
-    QSettings settings;
-    music_dir = settings.value("musid_dir").toString();
-    qDebug() << "Music dir on startup: " + music_dir;
-    settings.setValue("music_dir", music_dir);
+    if (!music_dir.isEmpty()) {
+        musicData->buildFrom(music_dir, /*update=*/false);
+    }
+    else
+    {
+        statusBar()->showMessage(tr("Open a music folder to get started (File → Open Music Folder)"));
+    }
 
     ui->timeSlider->setRange(0, 0);
     ui->timeSlider->setValue(0);
@@ -67,14 +52,17 @@ MainWindow::MainWindow(QWidget *parent)
     audioOutput->setVolume(volume);
     ui->volumeSlider->setValue(static_cast<int>(volume * 100));
 
-    //Make default playlist for testing
-    connect(musicData, &MusicData::finished, this, [this]() {
-        ui->playlist->buildFrom(musicData,
-                                "",
-                                "",
-                                "",
-                                true);
+    //Change text of pause button
+    connect(player, &QMediaPlayer::playingChanged, this, [this](){
+        if (player->isPlaying())
+            ui->pauseButton->setText("Pause");
+        else
+            ui->pauseButton->setText("Play");
     });
+
+    //Pause or play button
+    connect(ui->pauseButton,  &QPushButton::clicked, this, &MainWindow::pauseButtonClicked);
+
 
     //Load musicDataView when musicData is done
     connect(musicData, &MusicData::finished, this, [this](){
@@ -106,10 +94,6 @@ MainWindow::MainWindow(QWidget *parent)
         }
         ui->timeLabel->setText(formatTime(position) + " / " + formatTime(player->duration()));
     });
-
-    //Song Selected
-    connect(ui->playlist, &QListWidget::itemDoubleClicked,
-            this, &MainWindow::playlistSongSelected);
 
     //Change volume
     connect(ui->volumeSlider, &QSlider::valueChanged, this, [this]()
@@ -258,8 +242,7 @@ void MainWindow::on_actionOpen_Music_Folder_triggered()
                                                   "/home/smart/Music/Music (saved)",
                                                   QFileDialog::ShowDirsOnly
                                                 | QFileDialog::DontResolveSymlinks);
-    settings.setValue("music_dir", music_dir);
-    //ui->musicData->buildFrom(settings.value("music_dir").toString(), true);
+
     musicData->buildFrom(settings.value("music_dir").toString(), true);
 }
 

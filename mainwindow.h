@@ -39,7 +39,6 @@ private:
     QMediaPlayer *player;
     QAudioOutput * audioOutput;
     MusicData * musicData;
-    //Playlist * playlist;
     bool userSeeking = false;
     Playlist *createPlaylistTab(const QString &title);
     Playlist *currentPlaylist() const;

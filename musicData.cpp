@@ -17,27 +17,37 @@ MusicData::MusicData(QObject *parent)
 void MusicData::buildFrom(const QString &dir, bool update)
 {
     m_songs.clear();
-    QSettings settings;
-    player = new QMediaPlayer(this);
-
-    QString music_dir(dir);
+    m_pendingPaths.clear();
     m_currentDir = dir;
-    QStringList filters;
-    filters << "*.mp3" << "*.wav" << "*.flac" << "*.m4a" << "*.ogg" << "*.opus";
+    m_player = new QMediaPlayer(this);
 
-    if (update || !loadFromSettings(dir))
-    {
-        QDirIterator it(music_dir, filters, QDir::Files,
-                        QDirIterator::Subdirectories);
-        QMediaMetaData metaData = player->metaData();
-        while (it.hasNext())
-            m_pendingPaths << it.next();
-
-        connect(player, &QMediaPlayer::mediaStatusChanged,
-                this, &MusicData::onMediaStatusChanged);
-
-        loadNext();
+    // If not forcing an update, try the cache first.
+    if (!update && loadFromSettings(dir)) {
+        emit finished();
+        return;
     }
+
+    QSettings settings;
+    settings.setValue("music_dir", dir);
+
+    static const QStringList filters = {
+        "*.mp3", "*.wav", "*.flac", "*.m4a", "*.ogg", "*.opus"
+    };
+
+    QDirIterator it(dir, filters, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext())
+        m_pendingPaths << it.next();
+
+    if (m_pendingPaths.isEmpty()) {
+        saveToSettings();      // write an empty list so we don't rescan every launch
+        emit finished();
+        return;
+    }
+
+    connect(m_player, &QMediaPlayer::mediaStatusChanged,
+            this, &MusicData::onMediaStatusChanged);
+
+    loadNext();
 }
 
 
@@ -46,16 +56,13 @@ void MusicData::loadNext()
 
     if (m_pendingPaths.isEmpty())
     {
-        QSettings settings;
-        //addItems(new_data);
-        settings.setValue("music_dir", m_currentDir);
-        settings.setValue(m_currentDir, m_newData);
+        saveToSettings();
         emit finished();
         return;
     }
 
     m_currentPath = m_pendingPaths.takeFirst();
-    player->setSource(QUrl::fromLocalFile(m_currentPath));
+    m_player->setSource(QUrl::fromLocalFile(m_currentPath));
 }
 
 void MusicData::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
@@ -72,7 +79,7 @@ int MusicData::songCount() { return m_songs.count(); }
 Song MusicData::getSong(int index){ return m_songs.at(index); }
 
 void MusicData::extractData(QString path){
-    QMediaMetaData metaData = player->metaData();
+    QMediaMetaData metaData = m_player->metaData();
     QString artist = metaData.value(QMediaMetaData::ContributingArtist).toString();
     QString album  = metaData.value(QMediaMetaData::AlbumTitle).toString();
     QString genre  = metaData.value(QMediaMetaData::Genre).toString();
