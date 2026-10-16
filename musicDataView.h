@@ -4,8 +4,6 @@
 #include <QTreeWidget>
 #include "musicData.h"
 
-enum class SortMode { AlbumOnly, AlbumArtist, AlbumGenre, ArtistAlbumGenre };
-
 class MusicDataView: public QTreeWidget
 {
     Q_OBJECT

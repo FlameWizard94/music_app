@@ -32,15 +32,30 @@ MainWindow::MainWindow(QWidget *parent)
     player->setAudioOutput(audioOutput);
     //player->setSource(QUrl::fromLocalFile("/home/smart/Documents/Projects/Music Application/testing/Track 3.m4a"));
 
+    ui->playlistTabs->setTabsClosable(true);
+
 
     musicData = new MusicData(this);
     if (!music_dir.isEmpty()) {
         musicData->buildFrom(music_dir, /*update=*/false);
+        ui->musicDataView->buildFrom(musicData,
+                                     SortMode::AlbumArtist);
     }
     else
     {
         statusBar()->showMessage(tr("Open a music folder to get started (File → Open Music Folder)"));
     }
+
+    ui->sortOptionsBox->setPlaceholderText("Select sorting option");
+    for (const auto &[mode, label] : kSortModes)
+        ui->sortOptionsBox->addItem("Sort by " + label, QVariant::fromValue(int(mode)));
+
+    connect(ui->sortOptionsBox, &QComboBox::currentIndexChanged, this, [this](int index) {
+        if (index < 0) return;   //placeholder text
+        const int raw = ui->sortOptionsBox->itemData(index).toInt();
+        ui->musicDataView->buildFrom(musicData, static_cast<SortMode>(raw));
+    });
+
 
     ui->timeSlider->setRange(0, 0);
     ui->timeSlider->setValue(0);
@@ -163,12 +178,11 @@ void MainWindow::playlistSongSelected()
     if (!playlist) return;
 
 
-    QListWidgetItem * current = playlist->currentItem();
-    if (!current) return;
+    const Song * song = playlist->getSong(playlist->currentRow());
+    if (!song) return;
 
-    QString path = current->data(SongRoles::Path).toString();
-    int duration = current->data(SongRoles::Duration).toInt();
-    player->setSource(QUrl::fromLocalFile(path));
+    int duration = song->duration;
+    player->setSource(QUrl::fromLocalFile(song->path));
     ui->timeSlider->setMaximum((duration));
     ui->timeLabel->setText("00:00 / " + formatTime(duration));
     player->play();
@@ -183,14 +197,15 @@ Playlist *MainWindow::createPlaylistTab(const QString &title)
     layout->setContentsMargins(0, 0, 0, 0);
 
     auto *playlist = new Playlist(page);
+    playlist->linkToData(musicData);
     layout->addWidget(playlist);
 
     ui->playlistTabs->addTab(page, title);
     ui->playlistTabs->setCurrentWidget(page);
 
-    // Wire up double-click for this new playlist
-    connect(playlist, &QListWidget::itemDoubleClicked,
-            this, &MainWindow::playlistSongSelected);
+    //Double click to select song per playlist
+    connect(playlist, &QTableWidget::cellDoubleClicked,
+            this, [this](int, int) { playlistSongSelected(); });
 
     return playlist;
 }
@@ -245,4 +260,6 @@ void MainWindow::on_actionOpen_Music_Folder_triggered()
 
     musicData->buildFrom(settings.value("music_dir").toString(), true);
 }
+
+
 

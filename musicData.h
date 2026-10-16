@@ -14,6 +14,32 @@ struct Song {
             id = 0;
 };
 
+namespace SongRoles {
+enum Role {
+    Path        = Qt::UserRole,
+    Duration    = Qt::UserRole + 1,
+    Artist      = Qt::UserRole + 2,
+    Album       = Qt::UserRole + 3,
+    Title       = Qt::UserRole + 4,
+    Genre       = Qt::UserRole + 5,
+    Id          = Qt::UserRole + 6,
+};
+
+inline const QList<int> TrackRoles = {
+    Path, Duration, Artist, Album, Title, Genre, Id
+};
+}
+
+
+enum class SortMode { AlbumOnly, AlbumArtist, AlbumGenre, ArtistAlbumGenre };
+
+inline const QList<QPair<SortMode, QString>> kSortModes = {
+    { SortMode::AlbumOnly,          "Album"                },
+    { SortMode::AlbumArtist,        "Album / Artist"       },
+    { SortMode::AlbumGenre,         "Album / Genre"        },
+    { SortMode::ArtistAlbumGenre,   "Album / Artist / Genre" },
+};
+
 class MusicData : public QObject
 {
     Q_OBJECT
@@ -21,8 +47,8 @@ public:
     explicit MusicData(QObject *parent = nullptr);
     void buildFrom(const QString &dir,
                    bool update = false);
-    Song getSong(int index);
-    int songCount();
+    const Song &getSong(int index) const;
+    int songCount() const;
 
 
 signals:
@@ -44,21 +70,7 @@ private slots:
     void onMediaStatusChanged(QMediaPlayer::MediaStatus status);
 };
 
-namespace SongRoles {
-    enum Role {
-        Path        = Qt::UserRole,
-        Duration    = Qt::UserRole + 1,
-        Artist      = Qt::UserRole + 2,
-        Album       = Qt::UserRole + 3,
-        Title       = Qt::UserRole + 4,
-        Genre       = Qt::UserRole + 5,
-        Id          = Qt::UserRole + 6,
-    };
 
-    inline const QList<int> TrackRoles = {
-        Path, Duration, Artist, Album, Title, Genre, Id
-    };
-}
 
 
 #endif // MUSIC_DATA_H

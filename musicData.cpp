@@ -74,9 +74,9 @@ void MusicData::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
     }
 }
 
-int MusicData::songCount() { return m_songs.count(); }
+int MusicData::songCount() const { return m_songs.count(); }
 
-Song MusicData::getSong(int index){ return m_songs.at(index); }
+const Song &MusicData::getSong(int index) const{ return m_songs.at(index); }
 
 void MusicData::extractData(QString path){
     QMediaMetaData metaData = m_player->metaData();
