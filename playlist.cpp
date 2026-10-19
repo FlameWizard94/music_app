@@ -47,19 +47,15 @@ void Playlist::buildFrom(MusicData *musicData,
     clearContents();
     setRowCount(0);
 
-    m_name = "pl_" + name;
-
-    /*QSettings settings;
-    if (!update) {
-        QStringList saved = settings.value(key).toStringList();
-        if (!saved.isEmpty()) {
-            addItems(saved);
-            return;
-        }
-    } */
+    m_name = name;
 
     if (!musicData)
         return;
+
+    QSettings settings;
+    if (!update || loadFromSettings(name)) {
+        return;
+    }
 
     m_data = musicData;
 
@@ -78,7 +74,7 @@ void Playlist::buildFrom(MusicData *musicData,
 
 void Playlist::linkToData(MusicData * musicData) { m_data = musicData; }
 
-void Playlist::setName(QString name)
+void Playlist::setName(QString name, bool save)
 {
     QSettings settings;
     m_name = name;
@@ -88,7 +84,8 @@ void Playlist::setName(QString name)
     {
         playlist_data << item(i, 0)->text();
     }
-    settings.setValue(m_name, playlist_data);
+    if (save)
+        saveToSettings();
 }
 
 QString Playlist::getName(){ return m_name; }
@@ -135,6 +132,7 @@ void Playlist::appendSong(const Song &song)
     durationItem->setData(Qt::UserRole, song.duration);   // for sorting
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
+    saveToSettings();
 }
 
 
@@ -162,7 +160,24 @@ void Playlist::appendSong(QTreeWidgetItem * treeItem,
     durationItem->setData(Qt::UserRole, duration);   // for sorting
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
+    saveToSettings();
+}
 
+void Playlist::appendNodeChildSongs(QTreeWidgetItem * node)
+{
+    int num_children = node->childCount();
+    if(num_children > 0)
+    {
+        for (int i = 0; i < num_children; i++)
+        {
+            appendSong(node->child(i));
+        }
+    }
+    else
+    {
+        appendSong(node);
+    }
+    saveToSettings();
 }
 
 void Playlist::addSongData(QTableWidgetItem * item, Song song)
@@ -184,6 +199,7 @@ void Playlist::addSongData(QTableWidgetItem * item, Song song)
     durationItem->setData(Qt::UserRole, song.duration);   // for sorting
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
+    saveToSettings();
     return;
 }
 
@@ -203,7 +219,29 @@ void Playlist::saveToSettings() const
         m["duration"] = it->data(SongRoles::Duration);
         list << m;
     }
-    settings.setValue("pl_" + m_name, list);
+    settings.beginGroup("playlists");
+    settings.setValue(m_name, list);
+    settings.sync();
+    settings.endGroup();
+}
+
+bool Playlist::loadFromSettings(const QString &name)
+{
+    QSettings settings;
+    settings.beginGroup("playlists");
+    const QVariantList playlist_data = settings.value(name).toList();
+    settings.endGroup();
+    if (playlist_data.empty() || !m_data)
+        return false;
+
+    m_name = name;
+    for (const QVariant &v : playlist_data) {
+        const QVariantMap m = v.toMap();
+        int id = m.value("id").toInt();
+        Song song = m_data->getSong(id);
+        appendSong(song);
+    }
+    return true;
 }
 
 QString Playlist::formatTime(qint64 ms) const

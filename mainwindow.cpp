@@ -40,6 +40,15 @@ MainWindow::MainWindow(QWidget *parent)
         musicData->buildFrom(music_dir, /*update=*/false);
         ui->musicDataView->buildFrom(musicData,
                                      SortMode::AlbumArtist);
+        //Load playlists on startup
+        QSettings pl_settings;
+        pl_settings.beginGroup("playlists");
+        const QStringList names = pl_settings.allKeys();
+        pl_settings.endGroup();
+        for (const QString &name : names)
+        {
+            createPlaylistTab(name, true);
+        }
     }
     else
     {
@@ -129,6 +138,25 @@ MainWindow::MainWindow(QWidget *parent)
     //MusicDataView node selected
     connect(ui->musicDataView, &QTreeWidget::itemDoubleClicked, this, &MainWindow::musicDataSelected);
 
+    //Make new playlist
+    connect(ui->musicDataView, &MusicDataView::newPlaylistRequested,
+            this, &MainWindow::musicDataSelected);
+
+    //Append to current playlist
+    connect(ui->musicDataView, &MusicDataView::appendToCurrentPlaylistRequested,
+            this, &MainWindow::appendSongsToCurrentPlaylist);
+
+    //Remove playlist from settings when a tab is closed
+    connect(ui->playlistTabs, &QTabWidget::tabCloseRequested, this, [this](int index)
+    {
+        QSettings settings;
+        QWidget *page = ui->playlistTabs->widget(index);
+        if (!page) return;
+
+        Playlist *playlist = page->findChild<Playlist *>();
+        settings.remove(playlist->getName());
+    });
+
 
 }
 
@@ -152,25 +180,6 @@ void MainWindow::pauseButtonClicked(bool checked)
     }
 }
 
-void MainWindow::musicDataSelected(QTreeWidgetItem * node, int column)
-{
-    //QTreeWidgetItem * node = ui->musicDataView->selectedItems().at(0);
-    QString playlist_name = node->text(0);
-    Playlist * p = createPlaylistTab(playlist_name);
-    int num_children = node->childCount();
-    if(num_children > 0)
-    {
-        for (int i = 0; i < num_children; i++)
-        {
-            p->appendSong(node->child(i));
-        }
-    }
-    else
-    {
-        p->appendSong(node);
-    }
-}
-
 void MainWindow::playlistSongSelected()
 {
     QSettings defaults;
@@ -189,8 +198,22 @@ void MainWindow::playlistSongSelected()
     qDebug() << "Duration " << duration;
 }
 
+void MainWindow::musicDataSelected(QTreeWidgetItem * node)
+{
+    //QTreeWidgetItem * node = ui->musicDataView->selectedItems().at(0);
+    QString playlist_name = node->text(0);
+    Playlist * p = createPlaylistTab(playlist_name);
+    p->appendNodeChildSongs(node);
+}
 
-Playlist *MainWindow::createPlaylistTab(const QString &title)
+void MainWindow::appendSongsToCurrentPlaylist(QTreeWidgetItem * node)
+{
+    Playlist *playlist = currentPlaylist();
+    playlist->appendNodeChildSongs(node);
+}
+
+
+Playlist *MainWindow::createPlaylistTab(const QString &name, bool load)
 {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
@@ -200,8 +223,14 @@ Playlist *MainWindow::createPlaylistTab(const QString &title)
     playlist->linkToData(musicData);
     layout->addWidget(playlist);
 
-    ui->playlistTabs->addTab(page, title);
+    ui->playlistTabs->addTab(page, name);
     ui->playlistTabs->setCurrentWidget(page);
+
+    if (!name.isEmpty())
+        playlist->setName(name, false);
+
+    if (load)
+        (playlist->loadFromSettings(name));
 
     //Double click to select song per playlist
     connect(playlist, &QTableWidget::cellDoubleClicked,
@@ -258,7 +287,7 @@ void MainWindow::on_actionOpen_Music_Folder_triggered()
                                                   QFileDialog::ShowDirsOnly
                                                 | QFileDialog::DontResolveSymlinks);
 
-    musicData->buildFrom(settings.value("music_dir").toString(), true);
+    musicData->buildFrom(music_dir, true);
 }
 
 

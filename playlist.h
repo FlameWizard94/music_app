@@ -15,9 +15,11 @@ public:
     void appendSong(const Song &song);
     void appendSong(QTreeWidgetItem * item,
                     const QList<int> &roles = SongRoles::TrackRoles);
-    void setName(QString name);
+    void appendNodeChildSongs(QTreeWidgetItem * node);
+    void setName(QString name, bool save = true);
     QString getName();
     const Song * getSong(int row) const;
+    bool loadFromSettings(const QString &name);
 
 
 private:
@@ -31,6 +33,7 @@ private:
     QString formatTime(qint64 ms) const;
     void addSongData(QTableWidgetItem * item, Song song);
     void saveToSettings() const;
+
 
     MusicData * m_data = nullptr;
     QString m_name;

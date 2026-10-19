@@ -30,7 +30,8 @@ private slots:
     void pauseButtonClicked(bool checked);
     void playlistSongSelected();
     void on_actionOpen_Music_Folder_triggered();
-    void musicDataSelected(QTreeWidgetItem * node, int column);
+    void musicDataSelected(QTreeWidgetItem * node);
+    void appendSongsToCurrentPlaylist(QTreeWidgetItem * node);
 
 private:
     Ui::MainWindow *ui;
@@ -40,7 +41,7 @@ private:
     QAudioOutput * audioOutput;
     MusicData * musicData;
     bool userSeeking = false;
-    Playlist *createPlaylistTab(const QString &title);
+    Playlist *createPlaylistTab(const QString &name, bool load = false);
     Playlist *currentPlaylist() const;
     QString formatTime(qint64 ms);
 };
