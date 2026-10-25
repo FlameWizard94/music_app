@@ -11,6 +11,7 @@
 #include <QSlider>
 #include "musicData.h"
 #include "playlist.h"
+#include "playlist_tabbar.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -26,12 +27,20 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+signals:
+    void cancelEdit();
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private slots:
     void pauseButtonClicked(bool checked);
     void playlistSongSelected();
     void on_actionOpen_Music_Folder_triggered();
     void musicDataSelected(QTreeWidgetItem * node);
     void appendSongsToCurrentPlaylist(QTreeWidgetItem * node);
+    void startRenameTab(int index);
+    void commitRename(QLineEdit *editor, int index, PlaylistTabBar *bar, QString old);
 
 private:
     Ui::MainWindow *ui;

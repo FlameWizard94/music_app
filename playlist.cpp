@@ -11,10 +11,14 @@
 
 //Replace album and artist with listWidget called parameters
 
+int Playlist::activePlaylists = 0;
+
 Playlist::Playlist(QWidget *parent)
     : QTableWidget{parent}
 {
     setupColumns();
+    activePlaylists++;
+    id = activePlaylists;
 }
 
 void Playlist::setupColumns()
@@ -47,7 +51,10 @@ void Playlist::buildFrom(MusicData *musicData,
     clearContents();
     setRowCount(0);
 
-    m_name = name;
+    if (!name.isEmpty())
+        m_name = name;
+    else
+        m_name = "Playlist " + QString::number(activePlaylists);
 
     if (!musicData)
         return;
@@ -220,9 +227,20 @@ void Playlist::saveToSettings() const
         list << m;
     }
     settings.beginGroup("playlists");
-    settings.setValue(m_name, list);
+    settings.setValue(QString::number(id) + "_" + m_name, list);
     settings.sync();
     settings.endGroup();
+}
+
+void Playlist::removePlaylist()
+{
+    QSettings settings;
+    settings.beginGroup("playlists");
+    settings.remove(QString::number(id) + "_" + m_name);
+    activePlaylists--;
+    settings.sync();
+    settings.endGroup();
+    deleteLater();
 }
 
 bool Playlist::loadFromSettings(const QString &name)
@@ -234,7 +252,8 @@ bool Playlist::loadFromSettings(const QString &name)
     if (playlist_data.empty() || !m_data)
         return false;
 
-    m_name = name;
+    int underline = name.indexOf("_") + 1;
+    m_name = name.mid(underline);
     for (const QVariant &v : playlist_data) {
         const QVariantMap m = v.toMap();
         int id = m.value("id").toInt();

@@ -5,6 +5,11 @@
 #include <QDebug>
 #include "musicDataView.h"
 #include <QLayout>
+#include <qcoreevent.h>
+#include <QMouseEvent>
+#include <QKeyEvent>
+#include <QLineEdit>
+#include "playlist_tabbar.h"
 
 //To Do
 //1. User selects music dir
@@ -32,6 +37,12 @@ MainWindow::MainWindow(QWidget *parent)
     player->setAudioOutput(audioOutput);
     //player->setSource(QUrl::fromLocalFile("/home/smart/Documents/Projects/Music Application/testing/Track 3.m4a"));
 
+    PlaylistTabBar * bar = ui->playlistTabs->plTabBar();
+    bar->installEventFilter(this);
+
+    connect(bar, &PlaylistTabBar::tabDoubleClicked,
+            this, &MainWindow::startRenameTab);
+
     ui->playlistTabs->setTabsClosable(true);
 
 
@@ -42,6 +53,7 @@ MainWindow::MainWindow(QWidget *parent)
                                      SortMode::AlbumArtist);
         //Load playlists on startup
         QSettings pl_settings;
+        //pl_settings.remove("playlists");
         pl_settings.beginGroup("playlists");
         const QStringList names = pl_settings.allKeys();
         pl_settings.endGroup();
@@ -65,7 +77,6 @@ MainWindow::MainWindow(QWidget *parent)
         ui->musicDataView->buildFrom(musicData, static_cast<SortMode>(raw));
     });
 
-
     ui->timeSlider->setRange(0, 0);
     ui->timeSlider->setValue(0);
 
@@ -75,6 +86,7 @@ MainWindow::MainWindow(QWidget *parent)
     float volume = settings.value("volume").toFloat();
     audioOutput->setVolume(volume);
     ui->volumeSlider->setValue(static_cast<int>(volume * 100));
+
 
     //Change text of pause button
     connect(player, &QMediaPlayer::playingChanged, this, [this](){
@@ -132,6 +144,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->playlistTabs, &QTabWidget::tabCloseRequested, this, [this](int index) {
         QWidget *page = ui->playlistTabs->widget(index);
         ui->playlistTabs->removeTab(index);
+        Playlist *playlist = page->findChild<Playlist *>();
+        playlist->removePlaylist();
         page->deleteLater();
     });
 
@@ -145,17 +159,6 @@ MainWindow::MainWindow(QWidget *parent)
     //Append to current playlist
     connect(ui->musicDataView, &MusicDataView::appendToCurrentPlaylistRequested,
             this, &MainWindow::appendSongsToCurrentPlaylist);
-
-    //Remove playlist from settings when a tab is closed
-    connect(ui->playlistTabs, &QTabWidget::tabCloseRequested, this, [this](int index)
-    {
-        QSettings settings;
-        QWidget *page = ui->playlistTabs->widget(index);
-        if (!page) return;
-
-        Playlist *playlist = page->findChild<Playlist *>();
-        settings.remove(playlist->getName());
-    });
 
 
 }
@@ -206,6 +209,7 @@ void MainWindow::musicDataSelected(QTreeWidgetItem * node)
     p->appendNodeChildSongs(node);
 }
 
+
 void MainWindow::appendSongsToCurrentPlaylist(QTreeWidgetItem * node)
 {
     Playlist *playlist = currentPlaylist();
@@ -223,14 +227,20 @@ Playlist *MainWindow::createPlaylistTab(const QString &name, bool load)
     playlist->linkToData(musicData);
     layout->addWidget(playlist);
 
-    ui->playlistTabs->addTab(page, name);
-    ui->playlistTabs->setCurrentWidget(page);
-
-    if (!name.isEmpty())
+    if (load
+        && (playlist->loadFromSettings(name)) )
+    {
+        ui->playlistTabs->addTab(page, playlist->getName());
+        ui->playlistTabs->setCurrentWidget(page);
+    }
+    else if (!name.isEmpty())
+    {
         playlist->setName(name, false);
+        ui->playlistTabs->addTab(page, name);
+        ui->playlistTabs->setCurrentWidget(page);
+    }
 
-    if (load)
-        (playlist->loadFromSettings(name));
+
 
     //Double click to select song per playlist
     connect(playlist, &QTableWidget::cellDoubleClicked,
@@ -243,6 +253,100 @@ Playlist *MainWindow::currentPlaylist() const
 {
     QWidget *page = ui->playlistTabs->currentWidget();
     return page ? page->findChild<Playlist *>() : nullptr;
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    /*
+    if (watched == ui->playlistTabs->plTabBar()
+        && event->type() == QEvent::MouseButtonDblClick)
+    {
+        auto *me = static_cast<QMouseEvent *>(event);
+        if (me->button() == Qt::LeftButton) {
+            const int index = ui->playlistTabs->tabBar()->tabAt(me->pos());
+            if (index >= 0) {
+                startRenameTab(index);
+                return true;   // consume the event
+            }
+            else
+            {
+                createPlaylistTab("test");
+            }
+        }
+    }
+    */
+    if (auto *editor = qobject_cast<QLineEdit *>(watched)) {
+        if (event->type() == QEvent::FocusOut) {
+            // Lost focus — end the editing session, changed or not.
+            emit editor->editingFinished();
+            return false;   // let the focus change proceed
+        }
+        if (event->type() == QEvent::KeyPress) {
+            auto *ke = static_cast<QKeyEvent *>(event);
+            if (ke->key() == Qt::Key_Escape) {
+                emit editor->editingFinished();
+                return true;
+            }
+        }
+    }
+
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::startRenameTab(int index)
+{
+    PlaylistTabBar *bar = ui->playlistTabs->plTabBar();
+    if (index < 0 || index >= bar->count())
+        return;
+    if (bar->getEdittingTab() != -1)
+        return;   // already editing
+
+    bar->setEdittingTab(index);
+
+    auto *editor = new QLineEdit(bar->tabText(index), bar); //make a lineedit consisting of the tab taxt, make bar it's parent
+    editor->selectAll();
+
+    // Put the editor on the right side of the tab, and hide the tab's text.
+    bar->setTabButton(index, QTabBar::RightSide, editor);
+    QString old = bar->tabText(index);
+    bar->setTabText(index, QString());   // hide the label while editing
+
+    // Commit on Enter or focus loss; cancel on Escape.
+    connect(editor, &QLineEdit::editingFinished, this, [this, editor, index, bar, old]() {
+        commitRename(editor, index, bar, old);   // no-op if already committed
+    });
+
+    connect(bar, &PlaylistTabBar::emptyAreaDoubleClicked, this, [this]() {
+        createPlaylistTab("test");
+    });
+
+
+    // Escape — QLineEdit doesn't have a signal for this, so filter it.
+    editor->installEventFilter(this);
+
+    editor->setFocus();
+}
+
+void MainWindow::commitRename(QLineEdit *editor, int index, PlaylistTabBar *bar, QString old)
+{
+    if (!editor)
+        return;
+
+    const QString newName = editor->text().trimmed();
+
+    // Restore the normal tab layout first.
+    bar->setTabButton(index, QTabBar::RightSide, nullptr); //removes editor from position
+    bar->setTabText(index, newName.isEmpty() ? old : newName);
+    bar->setEdittingTab(-1);
+    editor->deleteLater();
+
+    // Update the playlist object and re-save.
+    QWidget *page = ui->playlistTabs->widget(index);
+    if (page) {
+        if (auto *playlist = page->findChild<Playlist *>()) {
+            playlist->setName(newName, true);
+        }
+    }
 }
 
 QString MainWindow::formatTime(qint64 ms)

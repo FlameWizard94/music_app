@@ -8,6 +8,8 @@ class Playlist : public QTableWidget
 {
     Q_OBJECT
 public:
+    static int activePlaylists;
+    ~Playlist(){}
     explicit Playlist(QWidget *parent = nullptr);
     void buildFrom(MusicData *data, const QString &name, bool update);
 
@@ -20,6 +22,7 @@ public:
     QString getName();
     const Song * getSong(int row) const;
     bool loadFromSettings(const QString &name);
+    void removePlaylist();
 
 
 private:
@@ -37,6 +40,7 @@ private:
 
     MusicData * m_data = nullptr;
     QString m_name;
+    int id; //so playlists can have the same names
 };
 
 #endif // PLAYLIST_H

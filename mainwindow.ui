@@ -100,7 +100,7 @@
      </property>
     </column>
    </widget>
-   <widget class="QTabWidget" name="playlistTabs">
+   <widget class="PlaylistTabWidget" name="playlistTabs">
     <property name="geometry">
      <rect>
       <x>870</x>
@@ -158,6 +158,12 @@
    <class>MusicDataView</class>
    <extends>QTreeWidget</extends>
    <header>musicDataView.h</header>
+  </customwidget>
+  <customwidget>
+   <class>PlaylistTabWidget</class>
+   <extends>QTabWidget</extends>
+   <header location="global">playlist_tabwidget.h</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources/>

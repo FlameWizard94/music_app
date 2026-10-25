@@ -39,6 +39,13 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         playlist.cpp
         musicDataView.h
         musicDataView.cpp
+        playlist_tabbar.h
+        playlist_tabbar.h
+        playlist_tabwidget.h
+
+
+
+
     )
 
 # Define target properties for Android with Qt 6 as:
