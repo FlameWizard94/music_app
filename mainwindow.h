@@ -44,11 +44,13 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
+    bool startedUp = false;
     QString music_dir;
     QPushButton * pauseButton;
     QMediaPlayer *player;
     QAudioOutput * audioOutput;
     MusicData * musicData;
+    int currentSortMode;
     bool userSeeking = false;
     Playlist *createPlaylistTab(const QString &name, bool load = false);
     Playlist *currentPlaylist() const;

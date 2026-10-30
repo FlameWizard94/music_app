@@ -7,6 +7,9 @@
 #include <QMediaMetaData>
 #include <QMediaPlayer>
 #include <QVector>
+#include <QThreadPool>
+#include <QMutex>
+#include <QFutureWatcher>
 
 struct Song {
     QString path, title, album, artist, genre;
@@ -30,7 +33,6 @@ inline const QList<int> TrackRoles = {
 };
 }
 
-
 enum class SortMode { AlbumOnly, AlbumArtist, AlbumGenre, ArtistAlbumGenre };
 
 inline const QList<QPair<SortMode, QString>> kSortModes = {
@@ -39,6 +41,9 @@ inline const QList<QPair<SortMode, QString>> kSortModes = {
     { SortMode::AlbumGenre,         "Album / Genre"        },
     { SortMode::ArtistAlbumGenre,   "Album / Artist / Genre" },
 };
+
+
+
 
 class MusicData : public QObject
 {
@@ -55,19 +60,13 @@ signals:
     void finished();
 
 private:
-    //QMediaMetaData * metaData;
     QVector<Song> m_songs;
-    QMediaPlayer * m_player;
-    QStringList m_pendingPaths;
-    QString m_currentPath;
+    QVector<QString> m_paths;
+    QFutureWatcher<QVector<Song>> m_watcher;
     QString m_currentDir;
     void saveToSettings() const;
     bool loadFromSettings(const QString &dir);
-    void extractData(QString path);
-    void loadNext();
-
-private slots:
-    void onMediaStatusChanged(QMediaPlayer::MediaStatus status);
+    Song extractDataFuture(int index) const;
 };
 
 

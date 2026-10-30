@@ -13,12 +13,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Posted by m.s.
 # Retrieved 2026-10-07, License - CC BY-SA 3.0
 
-# set(CMAKE_PREFIX_PATH "~/sw/Qt/Qt_5_4/5.4/gcc_64/")
+# set(TAGLIB_DIR "$ENV{HOME}/Documents/_C++ libraries/installed/taglib/")
 
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Multimedia)
+find_package(TagLib REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent)
 
 
 
@@ -42,10 +44,6 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         playlist_tabbar.h
         playlist_tabbar.h
         playlist_tabwidget.h
-
-
-
-
     )
 
 # Define target properties for Android with Qt 6 as:
@@ -71,6 +69,11 @@ target_include_directories(music_app PRIVATE
 )
 target_link_libraries(music_app PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(music_app PRIVATE Qt${QT_VERSION_MAJOR}::Multimedia)
+
+target_link_libraries(music_app PRIVATE Qt6::Concurrent)
+
+target_link_libraries(music_app PRIVATE TagLib::tag)
+
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

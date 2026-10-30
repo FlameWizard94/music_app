@@ -8,20 +8,26 @@
 #include <QMediaMetaData>
 #include <QSettings>
 #include <QDebug>
+#include <taglib/fileref.h>
+#include <QtConcurrentMap>
 
 MusicData::MusicData(QObject *parent)
     :QObject{parent}
 {
+    connect(&m_watcher, &QFutureWatcher<QVector<Song>>::finished, this, [this]()
+    {
+        m_songs = m_watcher.result();
+        saveToSettings();
+        emit finished();
+    });
 }
 
 void MusicData::buildFrom(const QString &dir, bool update)
 {
-    m_songs.clear();
-    m_pendingPaths.clear();
     m_currentDir = dir;
-    m_player = new QMediaPlayer(this);
+    m_songs.clear();
+    m_paths.clear();
 
-    // If not forcing an update, try the cache first.
     if (!update && loadFromSettings(dir)) {
         emit finished();
         return;
@@ -36,75 +42,53 @@ void MusicData::buildFrom(const QString &dir, bool update)
 
     QDirIterator it(dir, filters, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext())
-        m_pendingPaths << it.next();
+        m_paths.append(it.next());
 
-    if (m_pendingPaths.isEmpty()) {
-        saveToSettings();      // write an empty list so we don't rescan every launch
-        emit finished();
-        return;
-    }
-
-    connect(m_player, &QMediaPlayer::mediaStatusChanged,
-            this, &MusicData::onMediaStatusChanged);
-
-    loadNext();
-}
-
-
-void MusicData::loadNext()
-{
-
-    if (m_pendingPaths.isEmpty())
-    {
+    if (m_paths.isEmpty()) {
         saveToSettings();
         emit finished();
         return;
     }
 
-    m_currentPath = m_pendingPaths.takeFirst();
-    m_player->setSource(QUrl::fromLocalFile(m_currentPath));
+    //get indices
+    QVector<int> indices(m_paths.size());
+    std::iota(indices.begin(), indices.end(), 0);
+
+    //Each call returns a Song; mapped collects them into QVector<Song>.
+    QFuture<QVector<Song>> future = QtConcurrent::mappedReduced(
+        indices,
+        [this](int i) { return extractDataFuture(i); },
+        [](QVector<Song> &acc, const Song &s) { acc.append(s); });
+
+    m_watcher.setFuture(future);
 }
 
-void MusicData::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
+Song MusicData::extractDataFuture(int index) const
 {
-    if (status == QMediaPlayer::LoadedMedia)
-    {
-        extractData(m_currentPath);
-        loadNext();
-    }
+    Song s;
+    s.id   = index;
+    if (index > m_paths.size())
+        qDebug() << "here";
+    s.path = m_paths.at(index);
+    TagLib::FileRef ref(QFile::encodeName(s.path).constData());
+    if (ref.isNull() || !ref.tag())
+        return s;
+
+    const auto *tag = ref.tag();
+    s.title  = QString::fromStdWString(tag->title().toWString());
+    s.artist = QString::fromStdWString(tag->artist().toWString());
+    s.album  = QString::fromStdWString(tag->album().toWString());
+    s.genre  = QString::fromStdWString(tag->genre().toWString());
+    s.duration = ref.audioProperties()
+                     ? ref.audioProperties()->lengthInMilliseconds()
+                     : 0;
+    return s;
 }
 
 int MusicData::songCount() const { return m_songs.count(); }
 
 const Song &MusicData::getSong(int index) const{ return m_songs.at(index); }
 
-void MusicData::extractData(QString path){
-    QMediaMetaData metaData = m_player->metaData();
-    QString artist = metaData.value(QMediaMetaData::ContributingArtist).toString();
-    QString album  = metaData.value(QMediaMetaData::AlbumTitle).toString();
-    QString genre  = metaData.value(QMediaMetaData::Genre).toString();
-    QString title  = metaData.value(QMediaMetaData::Title).toString();
-    qlonglong durationMs = metaData.value(QMediaMetaData::Duration).toLongLong();
-
-    Song song;
-    song.id = m_songs.size();
-    song.path = path;
-    song.album = album;
-    song.artist = artist;
-    song.duration = durationMs;
-    song.genre = genre;
-    song.title = title;
-
-    qDebug() << song.id;
-    qDebug() << song.title;
-    qDebug() << song.path;
-    qDebug() << song.album;
-    qDebug() << song.artist;
-    qDebug() << song.duration;
-    qDebug() << song.genre;
-
-    m_songs.append(song);
-}
 
 void MusicData::saveToSettings() const
 {

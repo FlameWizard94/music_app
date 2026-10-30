@@ -10,6 +10,7 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include "playlist_tabbar.h"
+#include <QToolButton>
 
 //To Do
 //1. User selects music dir
@@ -19,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    QSettings settings;
     ui->setupUi(this);
 
     ui->pauseButton->setCheckable(true);
@@ -26,7 +28,12 @@ MainWindow::MainWindow(QWidget *parent)
     ui->menuBar->show();
     ui->menuFile->show();
 
-    QSettings settings;
+    currentSortMode = settings.value("sortMode").toInt();
+
+    ui->sortOptionsBox->setCurrentIndex(currentSortMode);
+    //ui->sortOptionsBox->setPlaceholderText("Select sorting option");
+
+
     music_dir = settings.value("music_dir").toString();
     qDebug() << "Music dir on startup: " + music_dir;
     settings.setValue("music_dir", music_dir);
@@ -48,34 +55,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     musicData = new MusicData(this);
     if (!music_dir.isEmpty()) {
-        musicData->buildFrom(music_dir, /*update=*/false);
-        ui->musicDataView->buildFrom(musicData,
-                                     SortMode::AlbumArtist);
-        //Load playlists on startup
-        QSettings pl_settings;
-        //pl_settings.remove("playlists");
-        pl_settings.beginGroup("playlists");
-        const QStringList names = pl_settings.allKeys();
-        pl_settings.endGroup();
-        for (const QString &name : names)
-        {
-            createPlaylistTab(name, true);
-        }
+        musicData->buildFrom(music_dir, /*update=*/true);
     }
     else
     {
         statusBar()->showMessage(tr("Open a music folder to get started (File → Open Music Folder)"));
     }
 
-    ui->sortOptionsBox->setPlaceholderText("Select sorting option");
-    for (const auto &[mode, label] : kSortModes)
-        ui->sortOptionsBox->addItem("Sort by " + label, QVariant::fromValue(int(mode)));
-
-    connect(ui->sortOptionsBox, &QComboBox::currentIndexChanged, this, [this](int index) {
-        if (index < 0) return;   //placeholder text
-        const int raw = ui->sortOptionsBox->itemData(index).toInt();
-        ui->musicDataView->buildFrom(musicData, static_cast<SortMode>(raw));
-    });
 
     ui->timeSlider->setRange(0, 0);
     ui->timeSlider->setValue(0);
@@ -86,7 +72,6 @@ MainWindow::MainWindow(QWidget *parent)
     float volume = settings.value("volume").toFloat();
     audioOutput->setVolume(volume);
     ui->volumeSlider->setValue(static_cast<int>(volume * 100));
-
 
     //Change text of pause button
     connect(player, &QMediaPlayer::playingChanged, this, [this](){
@@ -102,8 +87,38 @@ MainWindow::MainWindow(QWidget *parent)
 
     //Load musicDataView when musicData is done
     connect(musicData, &MusicData::finished, this, [this](){
+        QSettings settings;
+        currentSortMode = settings.value("sortMode").toInt();
         ui->musicDataView->buildFrom(musicData,
-                                     SortMode::AlbumArtist);
+                                     static_cast<SortMode>(currentSortMode));
+        //Load Playlists only on startup
+        if (!startedUp)
+        {
+            QSettings pl_settings;
+            //pl_settings.clear();
+            pl_settings.beginGroup("playlists");
+            const QStringList names = pl_settings.allKeys();
+            pl_settings.endGroup();
+            for (const QString &name : names)
+            {
+                createPlaylistTab(name, true);
+            }
+            startedUp = true;
+        }
+    });
+
+    //MDV sorting option options
+    for (const auto &[mode, label] : kSortModes)
+        ui->sortOptionsBox->addItem("Sort by " + label, QVariant::fromValue(int(mode)));
+
+    //Sorts MDV
+    connect(ui->sortOptionsBox, &QComboBox::currentIndexChanged, this, [this](int index) {
+        if (index < 0) return;   //placeholder text
+        const int raw = ui->sortOptionsBox->itemData(index).toInt();
+        currentSortMode = raw;
+        QSettings settings;
+        settings.setValue("sortMode", currentSortMode);
+        ui->musicDataView->buildFrom(musicData, static_cast<SortMode>(raw));
     });
 
     //When user presses slider, give user priority
@@ -240,8 +255,6 @@ Playlist *MainWindow::createPlaylistTab(const QString &name, bool load)
         ui->playlistTabs->setCurrentWidget(page);
     }
 
-
-
     //Double click to select song per playlist
     connect(playlist, &QTableWidget::cellDoubleClicked,
             this, [this](int, int) { playlistSongSelected(); });
@@ -257,24 +270,6 @@ Playlist *MainWindow::currentPlaylist() const
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    /*
-    if (watched == ui->playlistTabs->plTabBar()
-        && event->type() == QEvent::MouseButtonDblClick)
-    {
-        auto *me = static_cast<QMouseEvent *>(event);
-        if (me->button() == Qt::LeftButton) {
-            const int index = ui->playlistTabs->tabBar()->tabAt(me->pos());
-            if (index >= 0) {
-                startRenameTab(index);
-                return true;   // consume the event
-            }
-            else
-            {
-                createPlaylistTab("test");
-            }
-        }
-    }
-    */
     if (auto *editor = qobject_cast<QLineEdit *>(watched)) {
         if (event->type() == QEvent::FocusOut) {
             // Lost focus — end the editing session, changed or not.
@@ -314,10 +309,6 @@ void MainWindow::startRenameTab(int index)
     // Commit on Enter or focus loss; cancel on Escape.
     connect(editor, &QLineEdit::editingFinished, this, [this, editor, index, bar, old]() {
         commitRename(editor, index, bar, old);   // no-op if already committed
-    });
-
-    connect(bar, &PlaylistTabBar::emptyAreaDoubleClicked, this, [this]() {
-        createPlaylistTab("test");
     });
 
 
