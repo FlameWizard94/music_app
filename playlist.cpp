@@ -65,17 +65,6 @@ void Playlist::buildFrom(MusicData *musicData,
     }
 
     m_data = musicData;
-
-    //QStringList playlist_data;
-
-    int num = musicData->songCount();
-    for (int i = 0; i < num; ++i) {
-        Song song = musicData->getSong(i);
-
-        appendSong(song);
-        //playlist_data << item->text();
-    }
-
     saveToSettings();
 }
 
@@ -108,11 +97,9 @@ const Song *Playlist::getSong(int row) const
     if (!titleItem)
         return nullptr;
 
-    const int id = titleItem->data(SongRoles::Id).toInt();
-    if (id < 0 || id >= m_data->songCount())
-        return nullptr;
+    const QString path = titleItem->data(SongRoles::Path).toString();
 
-    return &m_data->getSong(id);
+    return m_data->getSong(path);
 }
 
 void Playlist::appendSong(const Song &song)
@@ -121,7 +108,7 @@ void Playlist::appendSong(const Song &song)
     insertRow(row);
 
     auto *titleItem = new QTableWidgetItem(song.title);
-    titleItem->setData(SongRoles::Id,       song.id);
+    //titleItem->setData(SongRoles::Id,       song.id);
     titleItem->setData(SongRoles::Path,     song.path);
     titleItem->setData(SongRoles::Artist,   song.artist);
     titleItem->setData(SongRoles::Album,    song.album);
@@ -191,7 +178,7 @@ void Playlist::addSongData(QTableWidgetItem * item, Song song)
 {
     int row = item->row();
     item->setText(song.title);
-    item->setData(SongRoles::Id, song.id);
+    //item->setData(SongRoles::Id, song.id);
     item->setData(SongRoles::Path, song.path);
     item->setData(SongRoles::Artist, song.artist);
     item->setData(SongRoles::Album, song.album);
@@ -217,7 +204,7 @@ void Playlist::saveToSettings() const
     for (int row = 0; row < rowCount(); ++row) {
         const QTableWidgetItem *it = item(row, kColTitle);
         QVariantMap m;
-        m["id"]       = it->data(SongRoles::Id);
+        //m["id"]       = it->data(SongRoles::Id);
         m["path"]     = it->data(SongRoles::Path);
         m["title"]    = it->data(SongRoles::Title);
         m["artist"]   = it->data(SongRoles::Artist);
@@ -256,9 +243,9 @@ bool Playlist::loadFromSettings(const QString &name)
     m_name = name.mid(underline);
     for (const QVariant &v : playlist_data) {
         const QVariantMap m = v.toMap();
-        int id = m.value("id").toInt();
-        Song song = m_data->getSong(id);
-        appendSong(song);
+        QString path = m.value("path").toString();
+        const Song * song = m_data->getSong(path);
+        appendSong(*song);
     }
     return true;
 }

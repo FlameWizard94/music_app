@@ -13,8 +13,11 @@
 
 struct Song {
     QString path, title, album, artist, genre;
-    qint64  duration = 0,
-            id = 0;
+    qint64  duration = 0;
+    //qitn64 id = 0;
+    //QSharedPointer<QImage> albumArt;
+    //QSharedPointer<AudioSample> waveformData;
+
 };
 
 namespace SongRoles {
@@ -25,11 +28,12 @@ enum Role {
     Album       = Qt::UserRole + 3,
     Title       = Qt::UserRole + 4,
     Genre       = Qt::UserRole + 5,
-    Id          = Qt::UserRole + 6,
+    //Id          = Qt::UserRole + 6,
 };
 
 inline const QList<int> TrackRoles = {
-    Path, Duration, Artist, Album, Title, Genre, Id
+    Path, Duration, Artist, Album, Title, Genre
+    //, Id
 };
 }
 
@@ -52,21 +56,25 @@ public:
     explicit MusicData(QObject *parent = nullptr);
     void buildFrom(const QString &dir,
                    bool update = false);
-    const Song &getSong(int index) const;
+    const Song * getSong(const QString path) const;
     int songCount() const;
+    const QHash<QString, Song> * allSongs() const;
 
 
 signals:
+    void scanProgress(int done, int total);
     void finished();
 
 private:
-    QVector<Song> m_songs;
+    //QVector<Song> m_songs;
+    QHash<QString, Song> m_songs;
     QVector<QString> m_paths;
-    QFutureWatcher<QVector<Song>> m_watcher;
+    QFutureWatcher<QHash<QString, Song>> m_watcher;
+    //QFutureWatcher<QVector<Song>> m_watcher;
     QString m_currentDir;
     void saveToSettings() const;
     bool loadFromSettings(const QString &dir);
-    Song extractDataFuture(int index) const;
+    Song extractDataFuture(QString path) const;
 };
 
 

@@ -91,7 +91,7 @@
       <x>10</x>
       <y>40</y>
       <width>431</width>
-      <height>961</height>
+      <height>811</height>
      </rect>
     </property>
     <column>
@@ -126,6 +126,35 @@
       <width>231</width>
       <height>26</height>
      </rect>
+    </property>
+   </widget>
+   <widget class="QProgressBar" name="musicDataBar">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>910</y>
+      <width>411</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="value">
+     <number>0</number>
+    </property>
+   </widget>
+   <widget class="QLabel" name="musicDataBarLabel">
+    <property name="geometry">
+     <rect>
+      <x>147</x>
+      <y>880</y>
+      <width>161</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
     </property>
    </widget>
   </widget>

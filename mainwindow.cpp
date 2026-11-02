@@ -21,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     QSettings settings;
+    settings.clear();
     ui->setupUi(this);
 
     ui->pauseButton->setCheckable(true);
@@ -31,18 +32,10 @@ MainWindow::MainWindow(QWidget *parent)
     currentSortMode = settings.value("sortMode").toInt();
 
     ui->sortOptionsBox->setCurrentIndex(currentSortMode);
-    //ui->sortOptionsBox->setPlaceholderText("Select sorting option");
-
-
-    music_dir = settings.value("music_dir").toString();
-    qDebug() << "Music dir on startup: " + music_dir;
-    settings.setValue("music_dir", music_dir);
-
 
     player = new QMediaPlayer(this);
     audioOutput = new QAudioOutput(this);
     player->setAudioOutput(audioOutput);
-    //player->setSource(QUrl::fromLocalFile("/home/smart/Documents/Projects/Music Application/testing/Track 3.m4a"));
 
     PlaylistTabBar * bar = ui->playlistTabs->plTabBar();
     bar->installEventFilter(this);
@@ -54,13 +47,19 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     musicData = new MusicData(this);
-    if (!music_dir.isEmpty()) {
-        musicData->buildFrom(music_dir, /*update=*/true);
-    }
-    else
-    {
-        statusBar()->showMessage(tr("Open a music folder to get started (File → Open Music Folder)"));
-    }
+    connect(musicData, &MusicData::scanProgress, this, [this](int done, int total) {
+        ui->musicDataBar->setMaximum(total);
+        ui->musicDataBar->setValue(done);
+        ui->musicDataBarLabel->setText(QString::number(done) + " / " + QString::number(total) + " files processed");
+        ui->musicDataBarLabel->setVisible(true);
+        ui->musicDataBar->setVisible(total > 0);
+    });
+    connect(musicData, &MusicData::finished, this, [this]() {
+        ui->musicDataBar->setVisible(false);
+        ui->musicDataBarLabel->setVisible(false);
+    });
+
+
 
 
     ui->timeSlider->setRange(0, 0);
@@ -106,6 +105,18 @@ MainWindow::MainWindow(QWidget *parent)
             startedUp = true;
         }
     });
+
+    music_dir = settings.value("music_dir").toString();
+    qDebug() << "Music dir on startup: " + music_dir;
+    settings.setValue("music_dir", music_dir);
+
+    if (!music_dir.isEmpty()) {
+        musicData->buildFrom(music_dir, /*update=*/false);
+    }
+    else
+    {
+        statusBar()->showMessage(tr("Open a music folder to get started (File → Open Music Folder)"));
+    }
 
     //MDV sorting option options
     for (const auto &[mode, label] : kSortModes)

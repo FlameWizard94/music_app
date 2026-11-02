@@ -21,11 +21,9 @@ void MusicDataView::buildFrom(MusicData * musicData, SortMode mode){
     m_parentNodes.clear();
     setColumnCount(1);
 
-    int num_tracks = musicData->songCount();
-    for (int i = 0; i < num_tracks; i++)
+    const QHash<QString, Song> * songs = musicData->allSongs();
+    for (const auto &song : *songs)
     {
-        Song song = musicData->getSong(i);
-
         const QString key = makeKey(song, mode).trimmed().toLower();
 
         QTreeWidgetItem *parent = m_parentNodes.value(key, nullptr);
@@ -83,7 +81,7 @@ QString MusicDataView::makeKey(const Song song, SortMode mode){
 void MusicDataView::addSongData(QTreeWidgetItem * item, Song song)
 {
     item->setText(0, song.title);
-    item->setData(0, SongRoles::Id, song.id);
+    //item->setData(0, SongRoles::Id, song.id);
     item->setData(0, SongRoles::Path, song.path);
     item->setData(0, SongRoles::Artist, song.artist);
     item->setData(0, SongRoles::Album, song.album);

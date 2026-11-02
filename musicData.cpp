@@ -20,6 +20,17 @@ MusicData::MusicData(QObject *parent)
         saveToSettings();
         emit finished();
     });
+    // MusicData constructor
+    connect(&m_watcher, &QFutureWatcher<QVector<Song>>::progressRangeChanged,
+        this, [this](int min, int max)
+    {
+        emit scanProgress(min, max == min ? 0 : m_paths.size());   // range known
+    });
+    connect(&m_watcher, &QFutureWatcher<QVector<Song>>::progressValueChanged,
+        this, [this](int v)
+    {
+        emit scanProgress(v, m_watcher.progressMaximum());
+    });
 }
 
 void MusicData::buildFrom(const QString &dir, bool update)
@@ -28,7 +39,8 @@ void MusicData::buildFrom(const QString &dir, bool update)
     m_songs.clear();
     m_paths.clear();
 
-    if (!update && loadFromSettings(dir)) {
+    if (!update &&
+        loadFromSettings(dir)) {
         emit finished();
         return;
     }
@@ -51,25 +63,22 @@ void MusicData::buildFrom(const QString &dir, bool update)
     }
 
     //get indices
-    QVector<int> indices(m_paths.size());
-    std::iota(indices.begin(), indices.end(), 0);
+    //QVector<int> indices(m_paths.size());
+    //std::iota(indices.begin(), indices.end(), 0);
 
     //Each call returns a Song; mapped collects them into QVector<Song>.
-    QFuture<QVector<Song>> future = QtConcurrent::mappedReduced(
-        indices,
-        [this](int i) { return extractDataFuture(i); },
-        [](QVector<Song> &acc, const Song &s) { acc.append(s); });
+    QFuture<QHash<QString, Song>> future = QtConcurrent::mappedReduced(
+        m_paths,
+        [this](QString path) { return extractDataFuture(path); },
+        [](QHash<QString, Song> &acc, const Song &s) { acc[s.path] = s; });
 
     m_watcher.setFuture(future);
 }
 
-Song MusicData::extractDataFuture(int index) const
+Song MusicData::extractDataFuture(QString path) const
 {
     Song s;
-    s.id   = index;
-    if (index > m_paths.size())
-        qDebug() << "here";
-    s.path = m_paths.at(index);
+    s.path = path;
     TagLib::FileRef ref(QFile::encodeName(s.path).constData());
     if (ref.isNull() || !ref.tag())
         return s;
@@ -87,7 +96,18 @@ Song MusicData::extractDataFuture(int index) const
 
 int MusicData::songCount() const { return m_songs.count(); }
 
-const Song &MusicData::getSong(int index) const{ return m_songs.at(index); }
+const Song * MusicData::getSong(const QString path) const
+{
+    auto it = m_songs.find(path);
+
+    if (it != m_songs.end()) {
+        return &it.value();
+    } else {
+        return nullptr;
+    }
+}
+
+const QHash<QString, Song> * MusicData::allSongs() const{ return &m_songs; };
 
 
 void MusicData::saveToSettings() const
@@ -97,9 +117,9 @@ void MusicData::saveToSettings() const
     QVariantList list;
     list.reserve(m_songs.size());
 
-    for (const Song &s : m_songs) {
+    for (const auto& s : m_songs) {
         QVariantMap m;
-        m["id"]         = s.id;
+        //m["id"]         = s.id;
         m["path"]       = s.path;
         m["title"]      = s.title;
         m["artist"]     = s.artist;
@@ -127,14 +147,14 @@ bool MusicData::loadFromSettings(const QString &dir)
     for (const QVariant &v : list) {
         const QVariantMap m = v.toMap();
         Song s;
-        s.id        = m.value("id").toInt();
+        //s.id        = m.value("id").toInt();
         s.path      = m.value("path").toString();
         s.title     = m.value("title").toString();
         s.artist    = m.value("artist").toString();
         s.album     = m.value("album").toString();
         s.genre     = m.value("genre").toString();
         s.duration  = m.value("duration").toLongLong();
-        m_songs << s;
+        m_songs[s.path] = s;
     }
 
     m_currentDir = dir;
