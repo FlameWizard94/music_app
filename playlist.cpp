@@ -2,6 +2,8 @@
 #include "musicData.h"
 #include <QSettings>
 #include <qheaderview.h>
+#include <qtconcurrentmap.h>
+#include <QElapsedTimer>
 
 //Get music dir and data from qsettings
 //If playlist is saved in settings and update is false, get playlist data from settings
@@ -102,7 +104,7 @@ const Song *Playlist::getSong(int row) const
     return m_data->getSong(path);
 }
 
-void Playlist::appendSong(const Song &song)
+void Playlist::appendSong(const Song &song, bool save)
 {
     const int row = rowCount();
     insertRow(row);
@@ -126,11 +128,13 @@ void Playlist::appendSong(const Song &song)
     durationItem->setData(Qt::UserRole, song.duration);   // for sorting
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
-    saveToSettings();
+    if (save)
+        saveToSettings();
 }
 
 
 void Playlist::appendSong(QTreeWidgetItem * treeItem,
+                          bool save,
                           const QList<int> &roles)
 {
     const int row = rowCount();
@@ -154,24 +158,31 @@ void Playlist::appendSong(QTreeWidgetItem * treeItem,
     durationItem->setData(Qt::UserRole, duration);   // for sorting
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
-    saveToSettings();
+    if (save)
+        saveToSettings();
 }
 
 void Playlist::appendNodeChildSongs(QTreeWidgetItem * node)
 {
+    QElapsedTimer * timer = new QElapsedTimer();
     int num_children = node->childCount();
-    if(num_children > 0)
+    timer->start();
+    qDebug() << "Start: " << timer->durationElapsed();
+
+    if (num_children > 0)
     {
         for (int i = 0; i < num_children; i++)
         {
-            appendSong(node->child(i));
+            appendSong(node->child(i), false);
+            qDebug() << i << " " << timer->durationElapsed();
         }
     }
-    else
-    {
+    else {
         appendSong(node);
     }
+    qDebug() << "Done: " << timer->durationElapsed();
     saveToSettings();
+
 }
 
 void Playlist::addSongData(QTableWidgetItem * item, Song song)
@@ -190,7 +201,7 @@ void Playlist::addSongData(QTableWidgetItem * item, Song song)
     setItem(row, kColArtist, new QTableWidgetItem(song.artist));
     setItem(row, kColAlbum,  new QTableWidgetItem(song.album));
     auto *durationItem = new QTableWidgetItem(formatTime(song.duration));
-    durationItem->setData(Qt::UserRole, song.duration);   // for sorting
+    durationItem->setData(Qt::UserRole, song.duration);
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
     saveToSettings();

@@ -21,7 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     QSettings settings;
-    settings.clear();
+    //settings.clear();
     ui->setupUi(this);
 
     ui->pauseButton->setCheckable(true);
@@ -393,7 +393,8 @@ void MainWindow::on_actionOpen_Music_Folder_triggered()
                                                   QFileDialog::ShowDirsOnly
                                                 | QFileDialog::DontResolveSymlinks);
 
-    musicData->buildFrom(music_dir, true);
+    if (!music_dir.isEmpty())
+        musicData->buildFrom(music_dir, true);
 }
 
 

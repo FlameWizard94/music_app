@@ -14,8 +14,10 @@ public:
     void buildFrom(MusicData *data, const QString &name, bool update);
 
     void linkToData(MusicData * musidData);
-    void appendSong(const Song &song);
+    void appendSong(const Song &song,
+                    bool save = true);
     void appendSong(QTreeWidgetItem * item,
+                    bool save = true,
                     const QList<int> &roles = SongRoles::TrackRoles);
     void appendNodeChildSongs(QTreeWidgetItem * node);
     void setName(QString name, bool save = true);
