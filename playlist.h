@@ -28,11 +28,14 @@ public:
 
 
 private:
-    static constexpr int kColTitle    = 0;
-    static constexpr int kColArtist   = 1;
-    static constexpr int kColAlbum    = 2;
-    static constexpr int kColDuration = 3;
-    static constexpr int kColumnCount = 4;
+    static constexpr int kColumnCount = 7;
+    static constexpr int kTrackNumber = 0;
+    static constexpr int kColTitle    = 1;
+    static constexpr int kColArtist   = 2;
+    static constexpr int kColAlbum    = 3;
+    static constexpr int kColDuration = 4;
+    static constexpr int kCreated = 5;
+    static constexpr int kRelease = 6;
 
     void setupColumns();
     QString formatTime(qint64 ms) const;

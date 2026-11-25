@@ -91,7 +91,7 @@
       <x>10</x>
       <y>40</y>
       <width>431</width>
-      <height>811</height>
+      <height>831</height>
      </rect>
     </property>
     <column>
@@ -103,11 +103,14 @@
    <widget class="PlaylistTabWidget" name="playlistTabs">
     <property name="geometry">
      <rect>
-      <x>870</x>
-      <y>60</y>
-      <width>941</width>
-      <height>811</height>
+      <x>610</x>
+      <y>40</y>
+      <width>1201</width>
+      <height>841</height>
      </rect>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::FocusPolicy::TabFocus</enum>
     </property>
     <property name="currentIndex">
      <number>0</number>
@@ -121,8 +124,8 @@
    <widget class="QComboBox" name="sortOptionsBox">
     <property name="geometry">
      <rect>
-      <x>450</x>
-      <y>40</y>
+      <x>10</x>
+      <y>10</y>
       <width>231</width>
       <height>26</height>
      </rect>
@@ -131,9 +134,9 @@
    <widget class="QProgressBar" name="musicDataBar">
     <property name="geometry">
      <rect>
-      <x>20</x>
+      <x>10</x>
       <y>910</y>
-      <width>411</width>
+      <width>431</width>
       <height>23</height>
      </rect>
     </property>
@@ -144,9 +147,9 @@
    <widget class="QLabel" name="musicDataBarLabel">
     <property name="geometry">
      <rect>
-      <x>147</x>
+      <x>27</x>
       <y>880</y>
-      <width>161</width>
+      <width>391</width>
       <height>20</height>
      </rect>
     </property>
@@ -155,6 +158,19 @@
     </property>
     <property name="alignment">
      <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="currentArt">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>540</y>
+      <width>431</width>
+      <height>331</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
     </property>
    </widget>
   </widget>

@@ -50,9 +50,9 @@ private:
     QMediaPlayer *player;
     QAudioOutput * audioOutput;
     MusicData * musicData;
-    int currentSortMode;
+    int currentGroupMode;
     bool userSeeking = false;
-    Playlist *createPlaylistTab(const QString &name, bool load = false);
+    Playlist *createPlaylistTab(const QString &name = "", bool load = false);
     Playlist *currentPlaylist() const;
     QString formatTime(qint64 ms);
 };

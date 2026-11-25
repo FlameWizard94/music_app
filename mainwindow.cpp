@@ -11,6 +11,9 @@
 #include <QLineEdit>
 #include "playlist_tabbar.h"
 #include <QToolButton>
+#include <QPixmap>
+#include <covercache.h>
+#include <QPainter>
 
 //To Do
 //1. User selects music dir
@@ -25,13 +28,17 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     ui->pauseButton->setCheckable(true);
+    ui->pauseButton->setFocusPolicy(Qt::NoFocus);
 
     ui->menuBar->show();
     ui->menuFile->show();
 
-    currentSortMode = settings.value("sortMode").toInt();
+    ui->currentArt->setVisible(false);
+    ui->musicDataBar->setVisible(false);
 
-    ui->sortOptionsBox->setCurrentIndex(currentSortMode);
+    currentGroupMode = settings.value("GroupMode").toInt();
+
+    ui->sortOptionsBox->setCurrentIndex(currentGroupMode);
 
     player = new QMediaPlayer(this);
     audioOutput = new QAudioOutput(this);
@@ -47,6 +54,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     musicData = new MusicData(this);
+
+    //Show progress bar when collecting music
     connect(musicData, &MusicData::scanProgress, this, [this](int done, int total) {
         ui->musicDataBar->setMaximum(total);
         ui->musicDataBar->setValue(done);
@@ -61,14 +70,15 @@ MainWindow::MainWindow(QWidget *parent)
 
 
 
-
     ui->timeSlider->setRange(0, 0);
     ui->timeSlider->setValue(0);
 
     ui->timeLabel->setText("00:00");
 
     ui->volumeSlider->setRange(0, 100);
-    float volume = settings.value("volume").toFloat();
+    float volume = 0.3;
+    if (settings.contains("volume"))
+        volume = settings.value("volume").toFloat();
     audioOutput->setVolume(volume);
     ui->volumeSlider->setValue(static_cast<int>(volume * 100));
 
@@ -87,9 +97,9 @@ MainWindow::MainWindow(QWidget *parent)
     //Load musicDataView when musicData is done
     connect(musicData, &MusicData::finished, this, [this](){
         QSettings settings;
-        currentSortMode = settings.value("sortMode").toInt();
+        currentGroupMode = settings.value("GroupMode").toInt();
         ui->musicDataView->buildFrom(musicData,
-                                     static_cast<SortMode>(currentSortMode));
+                                     static_cast<GroupMode>(currentGroupMode));
         //Load Playlists only on startup
         if (!startedUp)
         {
@@ -118,18 +128,22 @@ MainWindow::MainWindow(QWidget *parent)
         statusBar()->showMessage(tr("Open a music folder to get started (File → Open Music Folder)"));
     }
 
+
+    // CONNECTIONS --------------------------------------------------------------------------------------------
+
+
     //MDV sorting option options
-    for (const auto &[mode, label] : kSortModes)
+    for (const auto &[mode, label] : kGroupModes)
         ui->sortOptionsBox->addItem("Sort by " + label, QVariant::fromValue(int(mode)));
 
     //Sorts MDV
     connect(ui->sortOptionsBox, &QComboBox::currentIndexChanged, this, [this](int index) {
         if (index < 0) return;   //placeholder text
         const int raw = ui->sortOptionsBox->itemData(index).toInt();
-        currentSortMode = raw;
+        currentGroupMode = raw;
         QSettings settings;
-        settings.setValue("sortMode", currentSortMode);
-        ui->musicDataView->buildFrom(musicData, static_cast<SortMode>(raw));
+        settings.setValue("GroupMode", currentGroupMode);
+        ui->musicDataView->buildFrom(musicData, static_cast<GroupMode>(raw));
     });
 
     //When user presses slider, give user priority
@@ -174,6 +188,11 @@ MainWindow::MainWindow(QWidget *parent)
         playlist->removePlaylist();
         page->deleteLater();
     });
+
+    //Make new empty playlist
+    //Need tose lambda cause QT checks for number of parameter, despite defaults, when using connect like this
+    connect(ui->playlistTabs, &PlaylistTabWidget::emptyAreaDoubleClicked,
+            this, [this]() { createPlaylistTab(QString(), false); });
 
     //MusicDataView node selected
     connect(ui->musicDataView, &QTreeWidget::itemDoubleClicked, this, &MainWindow::musicDataSelected);
@@ -224,7 +243,25 @@ void MainWindow::playlistSongSelected()
     ui->timeSlider->setMaximum((duration));
     ui->timeLabel->setText("00:00 / " + formatTime(duration));
     player->play();
-    qDebug() << "Duration " << duration;
+    int width = ui->currentArt->width();
+    int height = ui->currentArt->height();
+    QImage cover;
+    cover.loadFromData(CoverCache::load(song->coverKey));
+    const QPixmap pix = QPixmap::fromImage(cover);
+
+    QPixmap canvas(width, height);
+    canvas.fill(Qt::black);
+
+    // Scale image preserving aspect ratio, then center it on the canvas
+    QPixmap scaled = pix.scaled(width, height, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    QPainter painter(&canvas);
+    int x = (width - scaled.width()) / 2;
+    int y = (height - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+    painter.end();
+
+    ui->currentArt->setPixmap(canvas);
+    ui->currentArt->setVisible(true);
 }
 
 void MainWindow::musicDataSelected(QTreeWidgetItem * node)
@@ -234,7 +271,6 @@ void MainWindow::musicDataSelected(QTreeWidgetItem * node)
     Playlist * p = createPlaylistTab(playlist_name);
     p->appendNodeChildSongs(node);
 }
-
 
 void MainWindow::appendSongsToCurrentPlaylist(QTreeWidgetItem * node)
 {
@@ -248,23 +284,14 @@ Playlist *MainWindow::createPlaylistTab(const QString &name, bool load)
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
+    //page->setFocusPolicy(Qt::NoFocus);
 
     auto *playlist = new Playlist(page);
-    playlist->linkToData(musicData);
+    playlist->buildFrom(musicData, name, false);
     layout->addWidget(playlist);
 
-    if (load
-        && (playlist->loadFromSettings(name)) )
-    {
-        ui->playlistTabs->addTab(page, playlist->getName());
-        ui->playlistTabs->setCurrentWidget(page);
-    }
-    else if (!name.isEmpty())
-    {
-        playlist->setName(name, false);
-        ui->playlistTabs->addTab(page, name);
-        ui->playlistTabs->setCurrentWidget(page);
-    }
+    ui->playlistTabs->addTab(page, playlist->getName());
+    ui->playlistTabs->setCurrentWidget(page);
 
     //Double click to select song per playlist
     connect(playlist, &QTableWidget::cellDoubleClicked,
@@ -272,6 +299,8 @@ Playlist *MainWindow::createPlaylistTab(const QString &name, bool load)
 
     return playlist;
 }
+
+
 
 Playlist *MainWindow::currentPlaylist() const
 {
@@ -283,9 +312,9 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
     if (auto *editor = qobject_cast<QLineEdit *>(watched)) {
         if (event->type() == QEvent::FocusOut) {
-            // Lost focus — end the editing session, changed or not.
+            //Lost focus
             emit editor->editingFinished();
-            return false;   // let the focus change proceed
+            return false;
         }
         if (event->type() == QEvent::KeyPress) {
             auto *ke = static_cast<QKeyEvent *>(event);

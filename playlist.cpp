@@ -26,10 +26,15 @@ Playlist::Playlist(QWidget *parent)
 void Playlist::setupColumns()
 {
     setColumnCount(kColumnCount);
-    setHorizontalHeaderLabels({ tr("Title"), tr("Artist"), tr("Album"), tr("Duration") });
+    setHorizontalHeaderLabels({ tr("Track"),
+                               tr("Title"),
+                               tr("Artist"),
+                               tr("Album"),
+                               tr("Duration"),
+                               tr("Date Created"),
+                               tr("Date Released") });
 
-    // Behavior tweaks
-    //setSortingEnabled(true);
+    setSortingEnabled(true);
     setSelectionBehavior(QAbstractItemView::SelectRows);   // select the whole row
     setSelectionMode(QAbstractItemView::ExtendedSelection);
     setEditTriggers(QAbstractItemView::NoEditTriggers);    // read-only, user can't edit cells
@@ -40,10 +45,13 @@ void Playlist::setupColumns()
 
     // Column sizing: Title stretches, the rest fit their content
     horizontalHeader()->setStretchLastSection(false);
-    horizontalHeader()->setSectionResizeMode(kColTitle,    QHeaderView::Stretch);
-    horizontalHeader()->setSectionResizeMode(kColArtist,   QHeaderView::ResizeToContents);
-    horizontalHeader()->setSectionResizeMode(kColAlbum,    QHeaderView::ResizeToContents);
-    horizontalHeader()->setSectionResizeMode(kColDuration, QHeaderView::ResizeToContents);
+    horizontalHeader()->setSectionResizeMode(kTrackNumber,  QHeaderView::ResizeToContents);
+    horizontalHeader()->setSectionResizeMode(kColTitle,     QHeaderView::Stretch);
+    horizontalHeader()->setSectionResizeMode(kColArtist,    QHeaderView::ResizeToContents);
+    horizontalHeader()->setSectionResizeMode(kColAlbum,     QHeaderView::ResizeToContents);
+    horizontalHeader()->setSectionResizeMode(kColDuration,  QHeaderView::ResizeToContents);
+    horizontalHeader()->setSectionResizeMode(kCreated,      QHeaderView::ResizeToContents);
+    horizontalHeader()->setSectionResizeMode(kRelease,      QHeaderView::ResizeToContents);
 }
 
 void Playlist::buildFrom(MusicData *musicData,
@@ -58,15 +66,13 @@ void Playlist::buildFrom(MusicData *musicData,
     else
         m_name = "Playlist " + QString::number(activePlaylists);
 
-    if (!musicData)
-        return;
+    if (musicData)
+        m_data = musicData;;
 
-    QSettings settings;
-    if (!update || loadFromSettings(name)) {
+    if (loadFromSettings(name) || !update) {
         return;
     }
 
-    m_data = musicData;
     saveToSettings();
 }
 
@@ -111,12 +117,17 @@ void Playlist::appendSong(const Song &song, bool save)
 
     auto *titleItem = new QTableWidgetItem(song.title);
     //titleItem->setData(SongRoles::Id,       song.id);
-    titleItem->setData(SongRoles::Path,     song.path);
-    titleItem->setData(SongRoles::Artist,   song.artist);
-    titleItem->setData(SongRoles::Album,    song.album);
-    titleItem->setData(SongRoles::Duration, song.duration);
-    titleItem->setData(SongRoles::Genre,    song.genre);
-    titleItem->setData(SongRoles::Title,    song.title);
+    titleItem->setData(SongRoles::Path,         song.path);
+    titleItem->setData(SongRoles::Artist,       song.artist);
+    titleItem->setData(SongRoles::Album,        song.album);
+    titleItem->setData(SongRoles::Duration,     song.duration);
+    titleItem->setData(SongRoles::Genre,        song.genre);
+    titleItem->setData(SongRoles::Title,        song.title);
+    titleItem->setData(SongRoles::TrackNumber,  song.track);
+    titleItem->setData(SongRoles::Release,      song.release);
+    titleItem->setData(SongRoles::Created,      song.created);
+
+    setItem(row, kTrackNumber, new QTableWidgetItem( QString::number(song.track) ));
 
     setItem(row, kColTitle, titleItem);
 
@@ -128,6 +139,10 @@ void Playlist::appendSong(const Song &song, bool save)
     durationItem->setData(Qt::UserRole, song.duration);   // for sorting
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
+
+    setItem(row, kCreated, new QTableWidgetItem(song.created.toString("dd/MM/yyyy")));
+    setItem(row, kRelease, new QTableWidgetItem( QString::number(song.release) ));
+
     if (save)
         saveToSettings();
 }
@@ -143,21 +158,27 @@ void Playlist::appendSong(QTreeWidgetItem * treeItem,
     for (int role : roles)
         new_item->setData(role, treeItem->data(0, role).toString());
 
-    QString artist = new_item->data(SongRoles::Artist).toString();
-    QString album = new_item->data(SongRoles::Album).toString();
-    qlonglong duration = new_item->data(SongRoles::Duration).toLongLong();
+    QString path = new_item->data(SongRoles::Path).toString();
+    const Song * song = m_data->getSong(path);
+
+
     new_item->setText(treeItem->text(0));
+
+    setItem(row, kTrackNumber, new QTableWidgetItem( QString::number(song->track) ));
 
     setItem(row, kColTitle, new_item);
 
-    setItem(row, kColArtist, new QTableWidgetItem(artist));
-    setItem(row, kColAlbum,  new QTableWidgetItem(album));
+    setItem(row, kColArtist, new QTableWidgetItem(song->artist));
+    setItem(row, kColAlbum,  new QTableWidgetItem(song->album));
 
-    //auto *durationItem = new NumericTableItem(formatDuration(song.duration));
-    auto *durationItem = new QTableWidgetItem(formatTime(duration));
-    durationItem->setData(Qt::UserRole, duration);   // for sorting
+    auto *durationItem = new QTableWidgetItem(formatTime(song->duration));
+    durationItem->setData(Qt::UserRole, song->duration);   // for sorting
     durationItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     setItem(row, kColDuration, durationItem);
+
+    setItem(row, kCreated, new QTableWidgetItem(song->created.toString("dd/MM/yyyy")));
+    setItem(row, kRelease, new QTableWidgetItem( QString::number(song->release) ));
+
     if (save)
         saveToSettings();
 }
@@ -173,7 +194,7 @@ void Playlist::appendNodeChildSongs(QTreeWidgetItem * node)
     {
         for (int i = 0; i < num_children; i++)
         {
-            appendSong(node->child(i), false);
+            appendSong(node->child(i), false); //Don't save song after each append
             qDebug() << i << " " << timer->durationElapsed();
         }
     }
@@ -181,7 +202,7 @@ void Playlist::appendNodeChildSongs(QTreeWidgetItem * node)
         appendSong(node);
     }
     qDebug() << "Done: " << timer->durationElapsed();
-    saveToSettings();
+    saveToSettings(); //save whole playlist
 
 }
 
@@ -222,10 +243,12 @@ void Playlist::saveToSettings() const
         m["album"]    = it->data(SongRoles::Album);
         m["genre"]    = it->data(SongRoles::Genre);
         m["duration"] = it->data(SongRoles::Duration);
+        m["created"]  = it->data(SongRoles::Created);
+        m["release"]  = it->data(SongRoles::Release);
         list << m;
     }
     settings.beginGroup("playlists");
-    settings.setValue(QString::number(id) + "_" + m_name, list);
+    settings.setValue(m_name, list);
     settings.sync();
     settings.endGroup();
 }
@@ -234,7 +257,7 @@ void Playlist::removePlaylist()
 {
     QSettings settings;
     settings.beginGroup("playlists");
-    settings.remove(QString::number(id) + "_" + m_name);
+    settings.remove(m_name);
     activePlaylists--;
     settings.sync();
     settings.endGroup();
