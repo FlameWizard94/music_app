@@ -38,6 +38,7 @@ void MusicDataView::buildFrom(MusicData * musicData, GroupMode mode){
                 parent->setText(0, key);
                 parent->setSizeHint(0, QSize(ITEM_WIDTH, PARENT_ITEM_SIZE));
                 m_parentNodes.insert(key, parent);
+                /*
                 if (parent->icon(0).isNull() && !song.coverKey.isEmpty())
                 {
                     if (!song.coverKey.isEmpty()) {
@@ -49,6 +50,7 @@ void MusicDataView::buildFrom(MusicData * musicData, GroupMode mode){
                         }
                     }
                 }
+                */
             }
 
             auto *track = new TrackItem(parent);
@@ -64,7 +66,33 @@ void MusicDataView::buildFrom(MusicData * musicData, GroupMode mode){
     sortItems(0, Qt::SortOrder::AscendingOrder);
 
     for (int i = 0; i < topLevelItemCount(); ++i)
+    {
         topLevelItem(i)->sortChildren(TrackItem::kSortColumn, Qt::AscendingOrder);
+    }
+
+    //Used to get CONSISTENT icons for parent nodes
+    for (const auto parent : std::as_const(m_parentNodes))
+    {
+        int num_children = parent->childCount();
+        for (int i = 0; i < num_children; i++)
+        {
+            QString path = parent->child(i)->data(0, SongRoles::Path).toString();
+            const Song * song = musicData->getSong(path);
+            if (song->coverKey.isEmpty())
+            {
+                continue;
+            }
+            else{
+                const QByteArray bytes = CoverCache::load(song->coverKey);
+                if (!bytes.isEmpty()) {
+                    QImage cover;
+                    if (cover.loadFromData(bytes) && !cover.isNull())
+                        parent->setIcon(0, QIcon(QPixmap::fromImage(cover)));
+                    break;
+                }
+            }
+        }
+    }
 }
 
 

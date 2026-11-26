@@ -34,8 +34,8 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
-    void pauseButtonClicked(bool checked);
-    void playlistSongSelected();
+    void pauseButtonClicked();
+    void playlistSongSelected(bool play = true);
     void on_actionOpen_Music_Folder_triggered();
     void musicDataSelected(QTreeWidgetItem * node);
     void appendSongsToCurrentPlaylist(QTreeWidgetItem * node);
@@ -54,6 +54,7 @@ private:
     bool userSeeking = false;
     Playlist *createPlaylistTab(const QString &name = "", bool load = false);
     Playlist *currentPlaylist() const;
+    void startUp();
     QString formatTime(qint64 ms);
 };
 #endif // MAINWINDOW_H

@@ -27,7 +27,6 @@ MainWindow::MainWindow(QWidget *parent)
     //settings.clear();
     ui->setupUi(this);
 
-    ui->pauseButton->setCheckable(true);
     ui->pauseButton->setFocusPolicy(Qt::NoFocus);
 
     ui->menuBar->show();
@@ -35,6 +34,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->currentArt->setVisible(false);
     ui->musicDataBar->setVisible(false);
+
+    //default is tab focus. for lineedit, so focus out occurs when it should
+    setFocusPolicy(Qt::ClickFocus);
+    //ui->playlistTabs->setFocusPolicy(Qt::ClickFocus); //default is tab focus. for lineedit, so focus out occurs when it should
+    //ui->playlistTabs->tabBar()->setFocusPolicy(Qt::ClickFocus);
 
     currentGroupMode = settings.value("GroupMode").toInt();
 
@@ -103,15 +107,7 @@ MainWindow::MainWindow(QWidget *parent)
         //Load Playlists only on startup
         if (!startedUp)
         {
-            QSettings pl_settings;
-            //pl_settings.clear();
-            pl_settings.beginGroup("playlists");
-            const QStringList names = pl_settings.allKeys();
-            pl_settings.endGroup();
-            for (const QString &name : names)
-            {
-                createPlaylistTab(name, true);
-            }
+            startUp();
             startedUp = true;
         }
     });
@@ -214,35 +210,80 @@ MainWindow::~MainWindow()
 }
 
 
-void MainWindow::pauseButtonClicked(bool checked)
+void MainWindow::pauseButtonClicked()
 {
-    if (checked)
-    {
-        player->play();
-        ui->pauseButton->setText("Pause");
-    }
-    else
-    {
+    if (player->isPlaying())
         player->pause();
-        ui->pauseButton->setText("Play");
+    else
+        player->play();
+}
+
+void MainWindow::startUp()
+{
+    QSettings settings;
+    QString path = settings.value("currently_playing").toString();
+    QString current_playlist = settings.value("current_playlist").toString();
+
+    const Song * song = musicData->getSong(path);
+
+    QSettings pl_settings;
+    //pl_settings.clear();
+    pl_settings.beginGroup("playlists");
+    const QStringList names = pl_settings.allKeys();
+    pl_settings.endGroup();
+
+    for (const QString &name : names)
+    {
+        createPlaylistTab(name, true);
+    }
+
+
+    if (names.contains(current_playlist))
+    {
+        //set current tab to current_playlist
+        for (int i = 0; i < ui->playlistTabs->count(); ++i)
+        {
+            const int current_row = settings.value("current_row").toInt();
+            if (ui->playlistTabs->tabText(i) == current_playlist)
+            {
+                ui->playlistTabs->setCurrentIndex(i);
+
+                //set current song if possible
+                Playlist * starting_pl = currentPlaylist();
+                const Song * starting_song = starting_pl->getSong(current_row);
+                if (starting_song && starting_song->path == path)
+                {
+                    starting_pl->setCurrentCell(current_row, 0);
+                    playlistSongSelected(false);
+                }
+                break;
+            }
+        }
+    }
+    else if (song)
+    {
+        createPlaylistTab(song->title, false);
+        Playlist * pl = currentPlaylist();
+        pl->appendSong(*song, true);
     }
 }
 
-void MainWindow::playlistSongSelected()
+void MainWindow::playlistSongSelected(bool play)
 {
     QSettings defaults;
     Playlist *playlist = currentPlaylist();
     if (!playlist) return;
-
 
     const Song * song = playlist->getSong(playlist->currentRow());
     if (!song) return;
 
     int duration = song->duration;
     player->setSource(QUrl::fromLocalFile(song->path));
+
     ui->timeSlider->setMaximum((duration));
     ui->timeLabel->setText("00:00 / " + formatTime(duration));
-    player->play();
+    if (play)
+        player->play();
     int width = ui->currentArt->width();
     int height = ui->currentArt->height();
     QImage cover;
@@ -262,6 +303,10 @@ void MainWindow::playlistSongSelected()
 
     ui->currentArt->setPixmap(canvas);
     ui->currentArt->setVisible(true);
+
+    defaults.setValue("currently_playing", song->path);
+    defaults.setValue("current_playlist", playlist->getName());
+    defaults.setValue("current_row", playlist->currentRow());
 }
 
 void MainWindow::musicDataSelected(QTreeWidgetItem * node)
@@ -323,6 +368,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
                 return true;
             }
         }
+
     }
 
     return QMainWindow::eventFilter(watched, event);
