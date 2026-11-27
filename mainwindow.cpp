@@ -94,8 +94,7 @@ MainWindow::MainWindow(QWidget *parent)
             ui->pauseButton->setText("Play");
     });
 
-    //Pause or play button
-    connect(ui->pauseButton,  &QPushButton::clicked, this, &MainWindow::pauseButtonClicked);
+
 
 
     //Load musicDataView when musicData is done
@@ -127,6 +126,18 @@ MainWindow::MainWindow(QWidget *parent)
 
     // CONNECTIONS --------------------------------------------------------------------------------------------
 
+
+    //Pause or play button
+    connect(ui->pauseButton,  &QPushButton::clicked, this, &MainWindow::pauseButtonClicked);
+
+    //Stop Button
+    connect(ui->stopButton,  &QPushButton::clicked, this, &MainWindow::stopButtonClicked);
+
+    //Previous song button
+    connect(ui->prevButton,  &QPushButton::clicked, this, &MainWindow::prevButtonClicked);
+
+    //Next song button
+    connect(ui->nextButton,  &QPushButton::clicked, this, &MainWindow::nextButtonClicked);
 
     //MDV sorting option options
     for (const auto &[mode, label] : kGroupModes)
@@ -216,6 +227,37 @@ void MainWindow::pauseButtonClicked()
         player->pause();
     else
         player->play();
+}
+
+void MainWindow::stopButtonClicked()
+{
+    if (player->hasAudio())
+    {
+        player->stop();
+        ui->currentArt->setVisible(false);
+        ui->timeSlider->setMaximum(0);
+        ui->timeLabel->setText("00:00");
+    }
+}
+
+void MainWindow::prevButtonClicked()
+{
+    Playlist *playlist = currentPlaylist();
+    int row = playlist->currentRow();
+    int total_rows = playlist->rowCount();
+    int new_row = (row - 1) % total_rows;
+    playlist->setCurrentCell(new_row, 0);
+    playlistSongSelected();
+}
+
+void MainWindow::nextButtonClicked()
+{
+    Playlist *playlist = currentPlaylist();
+    int row = playlist->currentRow();
+    int total_rows = playlist->rowCount();
+    int new_row = (row + 1) % total_rows;
+    playlist->setCurrentCell(new_row, 0);
+    playlistSongSelected();
 }
 
 void MainWindow::startUp()

@@ -35,6 +35,9 @@ protected:
 
 private slots:
     void pauseButtonClicked();
+    void stopButtonClicked();
+    void prevButtonClicked();
+    void nextButtonClicked();
     void playlistSongSelected(bool play = true);
     void on_actionOpen_Music_Folder_triggered();
     void musicDataSelected(QTreeWidgetItem * node);
